@@ -1,0 +1,27 @@
+{
+  "name": "rest-api-crd_app",
+  "version": "1.0.0",
+  "description": "Express.js REST API with Redis",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mihiradelkar/REST-API-CRD_APP.git"
+  },
+  "author": "mihiradelkar",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mihiradelkar/REST-API-CRD_APP/issues"
+  },
+  "homepage": "https://github.com/mihiradelkar/REST-API-CRD_APP#readme",
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "crypto": "^1.0.1",
+    "express": "^4.21.0",
+    "ioredis": "^5.4.1"
+  }
+}
