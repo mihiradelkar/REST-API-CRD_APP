@@ -3,6 +3,7 @@ const Ajv = require("ajv");
 const addFormats = require("ajv-formats");
 const fs = require("fs");
 const crypto = require("crypto");
+const stringify = require("json-stable-stringify");
 
 const redis = new Redis({ host: "redis", port: 6379 });
 const ajv = new Ajv();
@@ -17,17 +18,24 @@ const validate = ajv.compile(planSchema);
 // Create a plan
 exports.createPlan = async (req, res) => {
   const data = req.body;
-
-  // Validate request data against JSON schema
   if (!validate(data)) {
     return res.status(400).json({ errors: validate.errors });
   }
-
   const planId = data.objectId;
   try {
-    await redis.set(planId, JSON.stringify(data));
-    res.status(201).location(`/api/v1/plans/${planId}`).send();
+    await redis.set(planId, stringify(data));
+    const eTag = `"${crypto
+      .createHash("md5")
+      .update(stringify(data))
+      .digest("base64")}"`;
+
+    res
+      .set("ETag", eTag)
+      .location(`/api/v1/plans/${planId}`)
+      .status(201)
+      .send();
   } catch (err) {
+    console.error("Error in createPlan:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
@@ -45,9 +53,8 @@ exports.getPlanById = async (req, res) => {
 
     const eTag = `"${crypto.createHash("md5").update(plan).digest("base64")}"`;
 
-    // Log the ETag and If-None-Match header
-    console.log("Generated ETag:", eTag);
-    console.log("If-None-Match Header:", ifNoneMatch);
+    // console.log("Generated ETag:", eTag);
+    // console.log("If-None-Match Header:", ifNoneMatch);
 
     if (ifNoneMatch === eTag) {
       return res.status(304).send();
@@ -77,7 +84,7 @@ exports.deletePlanById = async (req, res) => {
 // Get all plans
 exports.getAllPlans = async (req, res) => {
   try {
-    const keys = await redis.keys("*"); // Get all keys from Redis
+    const keys = await redis.keys("*");
     const plans = [];
 
     for (const key of keys) {

@@ -22,6 +22,7 @@
     "ajv-formats": "^3.0.1",
     "crypto": "^1.0.1",
     "express": "^4.21.0",
-    "ioredis": "^5.4.1"
+    "ioredis": "^5.4.1",
+    "json-stable-stringify": "^1.1.1"
   }
 }
