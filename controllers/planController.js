@@ -5,7 +5,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const stringify = require("json-stable-stringify");
 
-const redis = new Redis({ host: "redis", port: 6379 });
+const redis = new Redis({ host: "localhost", port: 6379 });
 const ajv = new Ajv();
 addFormats(ajv);
 
