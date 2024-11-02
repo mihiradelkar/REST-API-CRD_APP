@@ -3,13 +3,16 @@ services:
     build: .
     ports:
       - "3000:3000"
+    env_file:
+      - .env.production
     links:
       - redis
     depends_on:
       - redis
-    environment:
-      - NODE_ENV=development
+    # restart: always
+
   redis:
     image: "redis:alpine"
     ports:
       - "6379:6379"
+    restart: always

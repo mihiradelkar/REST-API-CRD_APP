@@ -21,6 +21,31 @@ const planSchema = JSON.parse(
 );
 const validate = ajv.compile(planSchema);
 
+// Generate ETag
+const generateEtag = (data) =>
+  `"${crypto.createHash("md5").update(stringify(data)).digest("base64")}"`;
+
+// Check ETag conditions
+const checkETags = (req, res, eTag) => {
+  const ifNoneMatch = req.headers["if-none-match"];
+  const ifMatch = req.headers["if-match"];
+
+  // If `if-none-match` matches, return 304
+  if (ifNoneMatch && ifNoneMatch === eTag) {
+    return res.status(304).send();
+  }
+
+  // If `if-match` does not match, return 412
+  if (ifMatch && ifMatch !== eTag) {
+    return res
+      .status(412)
+      .json({ error: "Precondition Failed: Resource has been modified" });
+  }
+
+  // No condition met, continue with request processing
+  return null;
+};
+
 // Create a plan
 exports.createPlan = async (req, res) => {
   const data = req.body;
@@ -37,10 +62,7 @@ exports.createPlan = async (req, res) => {
   const planId = data.objectId;
   try {
     await redis.set(planId, stringify(data));
-    const eTag = `"${crypto
-      .createHash("md5")
-      .update(stringify(data))
-      .digest("base64")}"`;
+    const eTag = generateEtag(data);
 
     logger.info(`Plan created with ID: ${planId}`, { requestId, planId });
     res
@@ -57,7 +79,6 @@ exports.createPlan = async (req, res) => {
 // Get a plan by ID
 exports.getPlanById = async (req, res) => {
   const planId = req.params.id;
-  const ifNoneMatch = req.headers["if-none-match"];
   const { requestId } = req;
 
   try {
@@ -67,15 +88,14 @@ exports.getPlanById = async (req, res) => {
       return res.status(404).json({ error: "Plan not found" });
     }
 
-    const eTag = `"${crypto.createHash("md5").update(plan).digest("base64")}"`;
+    const eTag = generateEtag(plan);
 
-    if (ifNoneMatch === eTag) {
-      logger.info("Conditional read: Not Modified", { requestId, planId });
-      return res.status(304).send();
-    }
+    // Check ETag conditions
+    const conditionResult = checkETags(req, res, eTag);
+    if (conditionResult) return conditionResult; // End response if ETag condition met
 
     logger.info("Plan retrieved successfully", { requestId, planId });
-    res.set("ETag", eTag).json(JSON.parse(plan));
+    res.set("ETag", eTag).status(200).json(JSON.parse(plan));
   } catch (err) {
     logger.error("Error in getPlanById", { requestId, error: err.message });
     res.status(500).json({ error: "Internal Server Error" });
@@ -85,7 +105,6 @@ exports.getPlanById = async (req, res) => {
 // Update a plan
 exports.updatePlan = async (req, res) => {
   const planId = req.params.id;
-  const ifMatch = req.headers["if-match"];
   const { requestId } = req;
 
   if (!validate(req.body)) {
@@ -103,24 +122,16 @@ exports.updatePlan = async (req, res) => {
       return res.status(404).json({ error: "Plan not found" });
     }
 
-    const existingEtag = `"${crypto
-      .createHash("md5")
-      .update(existingPlan)
-      .digest("base64")}"`;
-    if (ifMatch && ifMatch !== existingEtag) {
-      logger.warn("Precondition failed for update", { requestId, planId });
-      return res
-        .status(412)
-        .json({ error: "Precondition Failed: Resource has been modified" });
-    }
+    const existingEtag = generateEtag(existingPlan);
+
+    // Check ETag conditions
+    const conditionResult = checkETags(req, res, existingEtag);
+    if (conditionResult) return conditionResult; // End response if ETag condition met
 
     const updatedPlan = req.body;
     await redis.set(planId, stringify(updatedPlan));
 
-    const newEtag = `"${crypto
-      .createHash("md5")
-      .update(stringify(updatedPlan))
-      .digest("base64")}"`;
+    const newEtag = generateEtag(updatedPlan);
     logger.info("Plan updated successfully", { requestId, planId });
     res.set("ETag", newEtag).status(200).json(updatedPlan);
   } catch (err) {
@@ -132,14 +143,13 @@ exports.updatePlan = async (req, res) => {
 // Partially update a plan using PATCH
 exports.patchPlan = async (req, res) => {
   const planId = req.params.id;
-  const ifMatch = req.headers["if-match"];
   const { requestId } = req;
 
-  // Create a deep clone of the schema to avoid modifying the original
+  // Validate schema for PATCH
   const patchSchema = JSON.parse(JSON.stringify(planSchema));
   makeSchemaOptional(patchSchema);
-
   const partialValidate = ajv.compile(patchSchema);
+
   if (!partialValidate(req.body)) {
     logger.warn("Validation failed for patchPlan", {
       requestId,
@@ -155,25 +165,17 @@ exports.patchPlan = async (req, res) => {
       return res.status(404).json({ error: "Plan not found" });
     }
 
-    const existingEtag = `"${crypto
-      .createHash("md5")
-      .update(existingPlan)
-      .digest("base64")}"`;
-    if (ifMatch && ifMatch !== existingEtag) {
-      logger.warn("Precondition failed for patch", { requestId, planId });
-      return res
-        .status(412)
-        .json({ error: "Precondition Failed: Resource has been modified" });
-    }
+    const existingEtag = generateEtag(existingPlan);
+
+    // Check ETag conditions
+    const conditionResult = checkETags(req, res, existingEtag);
+    if (conditionResult) return conditionResult; // End response if ETag condition met
 
     const partialUpdate = req.body;
     const mergedPlan = deepmerge(JSON.parse(existingPlan), partialUpdate);
 
     await redis.set(planId, stringify(mergedPlan));
-    const newEtag = `"${crypto
-      .createHash("md5")
-      .update(stringify(mergedPlan))
-      .digest("base64")}"`;
+    const newEtag = generateEtag(mergedPlan);
     logger.info("Plan patched successfully", { requestId, planId });
     res.set("ETag", newEtag).status(200).json(mergedPlan);
   } catch (err) {
@@ -188,11 +190,23 @@ exports.deletePlan = async (req, res) => {
   const { requestId } = req;
 
   try {
-    const deleted = await redis.del(planId);
-    if (deleted === 0) {
+    const plan = await redis.get(planId);
+    if (!plan) {
       logger.warn("Plan not found for delete", { requestId, planId });
       return res.status(404).json({ error: "Plan not found" });
     }
+
+    const eTag = generateEtag(plan);
+
+    // Check ETag conditions for delete
+    const conditionResult = checkETags(req, res, eTag);
+    if (conditionResult) return conditionResult; // End response if ETag condition met
+
+    const deleted = await redis.del(planId);
+    if (deleted === 0) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
     logger.info("Plan deleted successfully", { requestId, planId });
     res.status(204).send();
   } catch (err) {

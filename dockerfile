@@ -1,17 +1,19 @@
 # Use official Node.js image
-FROM node:14-alpine
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy package.json and install dependencies
-COPY package.json ./
+# Copy package.json and package-lock.json, then install dependencies
+COPY package*.json ./
 
-# Install dependencies
 RUN npm install
 
-# Copy application source code
+# Copy the application source code
 COPY . .
+
+# Set environment variable to production
+ENV NODE_ENV=production
 
 # Expose API port
 EXPOSE 3000
