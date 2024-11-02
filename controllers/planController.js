@@ -4,6 +4,7 @@ const addFormats = require("ajv-formats");
 const fs = require("fs");
 const crypto = require("crypto");
 const stringify = require("json-stable-stringify");
+const deepmerge = require("deepmerge");
 
 const redis = new Redis({ host: "localhost", port: 6379 });
 const ajv = new Ajv();
@@ -66,8 +67,79 @@ exports.getPlanById = async (req, res) => {
   }
 };
 
+// Update a plan
+exports.updatePlan = async (req, res) => {
+  const planId = req.params.id;
+  const ifMatch = req.headers["if-match"];
+
+  try {
+    const existingPlan = await redis.get(planId);
+    if (!existingPlan) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
+    const existingEtag = `"${crypto
+      .createHash("md5")
+      .update(existingPlan)
+      .digest("base64")}"`;
+    if (ifMatch && ifMatch !== existingEtag) {
+      return res
+        .status(412)
+        .json({ error: "Precondition Failed: Resource has been modified" });
+    }
+
+    const updatedPlan = req.body;
+    await redis.set(planId, stringify(updatedPlan));
+
+    const newEtag = `"${crypto
+      .createHash("md5")
+      .update(stringify(updatedPlan))
+      .digest("base64")}"`;
+    res.set("ETag", newEtag).status(200).json(updatedPlan);
+  } catch (err) {
+    console.error("Error in updatePlan:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// Patch a plan
+exports.patchPlan = async (req, res) => {
+  const planId = req.params.id;
+  const ifMatch = req.headers["if-match"];
+
+  try {
+    const existingPlan = await redis.get(planId);
+    if (!existingPlan) {
+      return res.status(404).json({ error: "Plan not found" });
+    }
+
+    const existingEtag = `"${crypto
+      .createHash("md5")
+      .update(existingPlan)
+      .digest("base64")}"`;
+    if (ifMatch && ifMatch !== existingEtag) {
+      return res
+        .status(412)
+        .json({ error: "Precondition Failed: Resource has been modified" });
+    }
+
+    const partialUpdate = req.body;
+    const mergedPlan = deepmerge(JSON.parse(existingPlan), partialUpdate);
+
+    await redis.set(planId, stringify(mergedPlan));
+    const newEtag = `"${crypto
+      .createHash("md5")
+      .update(stringify(mergedPlan))
+      .digest("base64")}"`;
+    res.set("ETag", newEtag).status(200).json(mergedPlan);
+  } catch (err) {
+    console.error("Error in patchPlan:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 // Delete a plan
-exports.deletePlanById = async (req, res) => {
+exports.deletePlan = async (req, res) => {
   const planId = req.params.id;
 
   try {

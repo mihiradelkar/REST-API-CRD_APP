@@ -14,7 +14,7 @@ function getKey(header, callback) {
   });
 }
 
-// Middleware to verify the token
+// Middleware to verify the token with audience and issuer validation
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   console.log("Auth Header:", authHeader);
@@ -23,7 +23,13 @@ const verifyToken = (req, res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
-  jwt.verify(token, getKey, { algorithms: ["RS256"] }, (err, decoded) => {
+  const options = {
+    algorithms: ["RS256"],
+    audience: "YOUR_GOOGLE_CLIENT_ID",
+    issuer: ["https://accounts.google.com", "accounts.google.com"],
+  };
+
+  jwt.verify(token, getKey, options, (err, decoded) => {
     if (err) {
       return res.status(403).json({ error: "Forbidden: Invalid token" });
     }
