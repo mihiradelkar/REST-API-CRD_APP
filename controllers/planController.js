@@ -5,6 +5,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const stringify = require("json-stable-stringify");
 const deepmerge = require("deepmerge");
+const { makeSchemaOptional } = require("../utils/helper");
 
 const redis = new Redis({ host: "localhost", port: 6379 });
 const ajv = new Ajv();
@@ -72,6 +73,10 @@ exports.updatePlan = async (req, res) => {
   const planId = req.params.id;
   const ifMatch = req.headers["if-match"];
 
+  if (!validate(req.body)) {
+    return res.status(400).json({ errors: validate.errors });
+  }
+
   try {
     const existingPlan = await redis.get(planId);
     if (!existingPlan) {
@@ -102,10 +107,21 @@ exports.updatePlan = async (req, res) => {
   }
 };
 
-// Patch a plan
+// Partially update a plan using PATCH
 exports.patchPlan = async (req, res) => {
   const planId = req.params.id;
   const ifMatch = req.headers["if-match"];
+
+  // Create a deep clone of the schema to avoid modifying the original
+  const patchSchema = JSON.parse(JSON.stringify(planSchema));
+  makeSchemaOptional(patchSchema); // Remove 'required' properties recursively
+
+  const partialValidate = ajv.compile(patchSchema); // Compile the modified schema for PATCH
+
+  // Validate the partial data
+  if (!partialValidate(req.body)) {
+    return res.status(400).json({ errors: partialValidate.errors });
+  }
 
   try {
     const existingPlan = await redis.get(planId);
