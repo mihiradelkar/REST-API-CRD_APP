@@ -34,7 +34,7 @@ const verifyToken = (req, res, next) => {
   const token = authHeader.split(" ")[1];
   const options = {
     algorithms: ["RS256"],
-    audience: "YOUR_GOOGLE_CLIENT_ID",
+    audience: process.env.GOOGLE_CLIENT_ID,
     issuer: ["https://accounts.google.com", "accounts.google.com"],
   };
 

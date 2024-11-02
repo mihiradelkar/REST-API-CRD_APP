@@ -7,6 +7,8 @@ services:
       - redis
     depends_on:
       - redis
+    environment:
+      - NODE_ENV=development
   redis:
     image: "redis:alpine"
     ports:

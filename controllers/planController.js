@@ -6,9 +6,12 @@ const crypto = require("crypto");
 const stringify = require("json-stable-stringify");
 const deepmerge = require("deepmerge");
 const { makeSchemaOptional } = require("../utils/helper");
-const logger = require("../utils/logger"); // Import the logger
+const logger = require("../utils/logger");
 
-const redis = new Redis({ host: "localhost", port: 6379 });
+const redis = new Redis({
+  host: process.env.REDIS_HOST,
+  port: process.env.REDIS_PORT,
+});
 const ajv = new Ajv();
 addFormats(ajv);
 

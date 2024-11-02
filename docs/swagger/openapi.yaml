@@ -1,0 +1,267 @@
+openapi: 3.0.0
+info:
+  title: Project API Documentation
+  version: 1.0.0
+  description: API documentation for the project, covering CRUD operations, conditional checks, and validation features
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
+
+paths:
+  /plans:
+    post:
+      summary: Create a new plan
+      tags: [Plans]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - objectId
+                - planCostShares
+              properties:
+                objectId:
+                  type: string
+                  description: Unique identifier for the plan
+                planType:
+                  type: string
+                  description: Type of the plan (e.g., inNetwork)
+                creationDate:
+                  type: string
+                  format: date
+                  description: Plan creation date
+                planCostShares:
+                  type: object
+                  properties:
+                    deductible:
+                      type: integer
+                    copay:
+                      type: integer
+                linkedPlanServices:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      linkedService:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          objectId:
+                            type: string
+                      planserviceCostShares:
+                        type: object
+                        properties:
+                          deductible:
+                            type: integer
+                          copay:
+                            type: integer
+      responses:
+        201:
+          description: Plan created successfully
+        400:
+          description: Validation error
+        500:
+          description: Internal server error
+
+    get:
+      summary: Get all plans
+      tags: [Plans]
+      security:
+        - BearerAuth: []
+      responses:
+        200:
+          description: List of all plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Plan'
+        500:
+          description: Internal server error
+
+  /plans/{id}:
+    get:
+      summary: Get a plan by ID
+      tags: [Plans]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the plan
+        - in: header
+          name: If-None-Match
+          schema:
+            type: string
+          description: ETag value for conditional retrieval
+      responses:
+        200:
+          description: Plan retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        304:
+          description: Not Modified (ETag match)
+        404:
+          description: Plan not found
+        500:
+          description: Internal server error
+
+    put:
+      summary: Update a plan by replacing it
+      tags: [Plans]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the plan
+        - in: header
+          name: If-Match
+          schema:
+            type: string
+          description: ETag value for conditional update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Plan'
+      responses:
+        200:
+          description: Plan updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        400:
+          description: Validation error
+        404:
+          description: Plan not found
+        412:
+          description: Precondition Failed (ETag mismatch)
+        500:
+          description: Internal server error
+
+    patch:
+      summary: Partially update a plan
+      tags: [Plans]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the plan
+        - in: header
+          name: If-Match
+          schema:
+            type: string
+          description: ETag value for conditional update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Partial plan data to update
+      responses:
+        200:
+          description: Plan updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        400:
+          description: Validation error
+        404:
+          description: Plan not found
+        412:
+          description: Precondition Failed (ETag mismatch)
+        500:
+          description: Internal server error
+
+    delete:
+      summary: Delete a plan by ID
+      tags: [Plans]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the plan
+      responses:
+        204:
+          description: Plan deleted successfully
+        404:
+          description: Plan not found
+        500:
+          description: Internal server error
+
+components:
+  schemas:
+    Plan:
+      type: object
+      properties:
+        objectId:
+          type: string
+        planType:
+          type: string
+        creationDate:
+          type: string
+          format: date
+        planCostShares:
+          type: object
+          properties:
+            deductible:
+              type: integer
+            copay:
+              type: integer
+        linkedPlanServices:
+          type: array
+          items:
+            type: object
+            properties:
+              linkedService:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  objectId:
+                    type: string
+              planserviceCostShares:
+                type: object
+                properties:
+                  deductible:
+                    type: integer
+                  copay:
+                    type: integer
